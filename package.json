@@ -1,0 +1,16 @@
+{
+  "name": "github-tools",
+  "version": "1.0.0",
+  "description": "This is a command-line interface (CLI) tool for analyzing data from GitHub repositories using the GitHub GraphQL API.",
+  "main": "index.js",
+  "dependencies": {
+    "octokit": "^2.0.10"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "type": "module",
+  "author": "Ashwin Pc",
+  "license": "ISC"
+}
