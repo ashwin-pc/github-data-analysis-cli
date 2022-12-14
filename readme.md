@@ -2,26 +2,28 @@
 This is a command-line interface (CLI) tool for analyzing data from GitHub repositories using the GitHub GraphQL API.
 
 ## Prerequisites
-- Node.js
+- Deno
 - A personal access token from GitHub with the read:user and read:org permissions.
 
 ## Installation
-To install the CLI tool, clone this repository and run the following command from the root directory:
-
-```
-npm install
-```
+Deno scripts do not require installation
 
 ## Usage
 To use the CLI tool, run the following command:
 
 ```
-npm start
+deno run <script_name>
+
+# e.g.
+deno run explore.ts
 ```
 
-This will start the tool and prompt you for your GitHub personal access token and the name of the repository you want to analyze.
+This will start the script and print the reults in the console or into a file depending on the script
 
-Once you have entered this information, the CLI will connect to the GitHub GraphQL API and retrieve data about the repository. It will then display a summary of the data, including the number of stars, forks, and open issues, as well as the repository's primary language and the date of the last push.
+## Using the github graphql explorer
 
-License
-This project is licensed under the MIT License. See the LICENSE file for details.
+Use the GitHub GraphQL Explorer to test your queries. First make sure you have a GitHub account and are logged in. Then, go to the Explorer page by navigating to https://docs.github.com/en/graphql/overview/explorer.
+
+Once on the Explorer page, you can start by typing in a query in the left-hand panel. The query will automatically be executed and the results will be displayed in the right-hand panel. You can also use the dropdown menus and autocomplete suggestions to help you construct your query.
+
+Use the `explore.ts` script to run the query and transform its response for data analysis
