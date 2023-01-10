@@ -1,24 +1,33 @@
-import { createWriteStream, readFileSync } from "fs";
-import { writeFile } from "fs/promises";
-import { Octokit } from "octokit";
+// deno-lint-ignore-file no-explicit-any
+import { config } from "https://deno.land/x/dotenv@v3.2.0/mod.ts";
+import { createWriteStream } from "https://deno.land/std@0.171.0/node/fs.ts";
+import { Octokit } from "npm:octokit";
+import { IGNORE_PRS } from "./backport_ignore.ts";
 
+const configData = await config();
+
+// Use for debugging the script
 const DEBUG = {
   src: 2625,
   dest: 2642,
 };
-const USE_CACHE = true;
-const IGNORE_PRS = [1860, 2645, 2673, 2581, 2587, 2639, 2673];
+
+const USE_CACHE = Boolean(configData["CACHE"]) || false;
+const CACHE_FILE = "./data/cache.json";
+const LOG_FILE = "./data/log.md";
 const BACKPORT_PREFIX_RGX = /\[Backport \d..\] ?(.*)/i;
 const octokit = new Octokit({
-  auth: "xxx",
+  auth: configData["ACCESS_TOKEN"],
 });
+const { readFile, writeFile } = Deno;
 
-const log = (message) => console.log("\x1b[36m%s\x1b[0m", `-- ${message}`);
+const log = (message: string) =>
+  console.log("\x1b[36m%s\x1b[0m", `-- ${message}`);
 
 const getAllPrs = async () => {
   const pageSize = 100;
   let page = 1;
-  let data = [];
+  let data: any[] = [];
   let fetching = true;
 
   while (fetching) {
@@ -30,6 +39,8 @@ const getAllPrs = async () => {
       state: "all",
       page,
     });
+
+    res.data;
 
     if (res.status !== 200) throw Error("failed to fetch data");
 
@@ -45,14 +56,14 @@ const getAllPrs = async () => {
   return data;
 };
 
-const isBackPortLabel = (label) =>
+const isBackPortLabel = (label: any) =>
   label.name.match(/backport [\d\..|main]/) !== null;
-const getbackportLabels = (pr) => pr.labels.filter(isBackPortLabel);
+const getbackportLabels = (pr: any) => pr.labels.filter(isBackPortLabel);
 
-const getSearchString = (title) => {
+const getSearchString = (title: string) => {
   let s = title;
   // Remove regex match group
-  const simplify = (str, regex) => {
+  const simplify = (str: string, regex: RegExp) => {
     const match = str.match(regex);
     return match ? match[1] : str;
   };
@@ -67,13 +78,14 @@ const getSearchString = (title) => {
   return s;
 };
 
-const search = (a, b) =>
+const search = (a: string, b: string) =>
   a.toLowerCase().trim().includes(b.toLowerCase().trim());
 
-const isBackportPr = (pr) => !!pr.title.match(BACKPORT_PREFIX_RGX);
+const isBackportPr = (pr: any) => !!pr.title.match(BACKPORT_PREFIX_RGX);
 
-const isBackportOfPr = (pr, backPr) => {
+const isBackportOfPr = (pr: any, backPr: any): boolean => {
   if (pr.number === DEBUG.src && backPr.number === DEBUG.dest) {
+    // deno-lint-ignore no-debugger
     debugger;
   }
 
@@ -84,21 +96,26 @@ const isBackportOfPr = (pr, backPr) => {
   if ((titleInBackTitle || idInBackTitle) && titleIncludesBackportPrefix) {
     return true;
   }
+
+  return false;
 };
 
 // -------- MAIN app ---------------
 
 console.clear();
-log("Started app");
-let prs = [];
+log("Started script");
+let prs: any[] = [];
 if (USE_CACHE) {
   log("Loading cache data");
-  prs = JSON.parse(readFileSync("./prs.json", "utf-8"));
+  const decoder = new TextDecoder("utf-8");
+  const data = await readFile(CACHE_FILE);
+  prs = JSON.parse(decoder.decode(data));
 } else {
   log("Loading github data");
   prs = await getAllPrs();
   log("Loaded data, writing to cache file now");
-  await writeFile("./prs.json", JSON.stringify(prs));
+  const encoder = new TextEncoder();
+  await writeFile(CACHE_FILE, encoder.encode(JSON.stringify(prs)));
   log("Data written, processing...");
 }
 
@@ -111,20 +128,15 @@ const prsToValidate = prs.filter((pr) => {
   return backportLabels.length > 0;
 });
 
-// debugger;
-
 log("Get all Backport PRs");
 const backportPrs = prs.filter(isBackportPr);
 
 log("Caculate PRs with missing backports");
-const missingBackports = {};
+const missingBackports: any = {};
 prsToValidate.forEach((pr) => {
-  pr.labels.forEach((label) => {
+  pr.labels.forEach((label: any) => {
     if (!isBackPortLabel(label)) return;
 
-    // if (pr.title.includes("Bumps chromedriver to v100 ")) {
-    //   debugger;
-    // }
     const backportPrsForThisPrLabel = backportPrs.filter((backPr) => {
       return isBackportOfPr(pr, backPr);
     });
@@ -146,13 +158,14 @@ prsToValidate.forEach((pr) => {
 });
 
 // Write to file
-const logFile = "./log.md";
-const writeStream = createWriteStream(logFile);
+const writeStream = createWriteStream(LOG_FILE);
 writeStream.write("# Missing backport PR's\n\n");
-Object.values(missingBackports).forEach(({ pr, verifyUrl, labels }) => {
+Object.values(missingBackports).forEach(({ pr, verifyUrl, labels }: any) => {
   const msg = [
     `- ${pr.title}  `,
-    `    Missing backports: ${JSON.stringify(labels.map((l) => l.name))}  `,
+    `    Missing backports: ${JSON.stringify(
+      labels.map((l: any) => l.name)
+    )}  `,
     `    ID: ${pr.number} | [Verify](${verifyUrl})\n`,
   ].join("\n");
 
@@ -168,7 +181,7 @@ writeStream.on("finish", () => {
       `To Backport      : ${prsToValidate.length}`,
       `Missing Backports: ${Object.keys(missingBackports).length}`,
       ``,
-      `Check ${logFile} for missing backport PR's`,
+      `Check ${LOG_FILE} for missing backport PR's`,
     ].join("\n")
   );
 });
