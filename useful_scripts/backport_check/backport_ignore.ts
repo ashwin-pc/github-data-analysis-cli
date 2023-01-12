@@ -1,10 +1,6 @@
 // PR's to skip due to known reasons
 export const IGNORE_PRS = [
-  1860, // Verison increment PR, no longer relevant
-  2645, // Add skip reason
-  2673, // Add skip reason
-  2581, // Add skip reason
-  2587, // Add skip reason
-  2639, // Add skip reason
-  2673, // Add skip reason
+  1190, // https://github.com/opensearch-project/OpenSearch-Dashboards/issues/3262
+  2645, // Manually backported in a combined PR https://github.com/opensearch-project/OpenSearch-Dashboards/pull/2767
+  2673, // Manually backported in a combined PR https://github.com/opensearch-project/OpenSearch-Dashboards/pull/2767
 ];

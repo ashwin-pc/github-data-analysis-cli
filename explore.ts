@@ -8,7 +8,6 @@ const octokit = new Octokit({
   auth: configData["ACCESS_TOKEN"],
 });
 
-// deno-lint-ignore no-explicit-any
 const result: any = await octokit.graphql(`
 {
   repository(name: "OpenSearch-Dashboards", owner: "opensearch-project") {

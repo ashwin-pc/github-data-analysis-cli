@@ -6,13 +6,13 @@ import { IGNORE_PRS } from "./backport_ignore.ts";
 
 const configData = await config();
 
-// Use for debugging the script
+// Use for debugging the script to understand why the check did not find the correct backport PR
 const DEBUG = {
-  src: 2625,
-  dest: 2642,
+  src: 2890,
+  dest: 2924,
 };
 
-const USE_CACHE = Boolean(configData["CACHE"]) || false;
+const USE_CACHE = configData["CACHE"] === "true" || false;
 const CACHE_FILE = "./data/cache.json";
 const LOG_FILE = "./data/log.md";
 const BACKPORT_PREFIX_RGX = /\[Backport \d..\] ?(.*)/i;
@@ -130,6 +130,8 @@ const prsToValidate = prs.filter((pr) => {
 
 log("Get all Backport PRs");
 const backportPrs = prs.filter(isBackportPr);
+
+debugger;
 
 log("Caculate PRs with missing backports");
 const missingBackports: any = {};
