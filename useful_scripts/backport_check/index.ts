@@ -15,7 +15,7 @@ const DEBUG = {
 const USE_CACHE = configData["CACHE"] === "true" || false;
 const CACHE_FILE = "./data/cache.json";
 const LOG_FILE = "./data/log.md";
-const BACKPORT_PREFIX_RGX = /\[Backport \d..\] ?(.*)/i;
+const BACKPORT_PREFIX_RGX = /\[.*Backport \d..\] ?(.*)/i;
 const octokit = new Octokit({
   auth: configData["ACCESS_TOKEN"],
 });

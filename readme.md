@@ -41,7 +41,7 @@ Use the `explore.ts` script to run the query and transform its response for data
 ## Useful scripts
 ### Backport check
 
-To validate if each Pr that needs tobe backported has a corresponding backport Pr that as been merged, run the backport check script
+To validate if each Pr that needs to be backported has a corresponding backport Pr that as been merged, run the backport check script
 
 ```
 deno run --allow-all ./useful_scripts/backport_check/index.ts
