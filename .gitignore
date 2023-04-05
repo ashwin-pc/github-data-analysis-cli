@@ -2,3 +2,4 @@ node_modules
 log.md
 .env
 data
+.DS_Store

@@ -1,8 +1,13 @@
-// deno-lint-ignore-file no-explicit-any
 import { config } from "https://deno.land/x/dotenv@v3.2.0/mod.ts";
 import { createWriteStream } from "https://deno.land/std@0.171.0/node/fs.ts";
 import { Octokit } from "npm:octokit";
 import { IGNORE_PRS } from "./backport_ignore.ts";
+import {
+  Repository,
+  LabelEdge,
+  PullRequest,
+} from "npm:@octokit/graphql-schema";
+import { removeMaybe } from "../../utils/index.ts";
 
 const configData = await config();
 
@@ -26,39 +31,67 @@ const log = (message: string) =>
 
 const getAllPrs = async () => {
   const pageSize = 100;
+  let cursor;
   let page = 1;
-  let data: any[] = [];
+  let data: PullRequest[] = [];
   let fetching = true;
 
   while (fetching) {
     log(`loading data for page ${page}`);
-    const res = await octokit.request("GET /repos/{owner}/{repo}/pulls", {
-      owner: "opensearch-project",
-      repo: "OpenSearch-Dashboards",
-      per_page: pageSize,
-      state: "all",
-      page,
-    });
+    const after: string = cursor ? `after:"${cursor}"` : "";
 
-    res.data;
+    const res = await octokit.graphql<{ repository: Repository }>(`
+    {
+      repository(name: "OpenSearch-Dashboards", owner: "opensearch-project") {
+        pullRequests(first: ${pageSize}, ${after}) {
+          edges {
+            cursor,
+            node {
+              title
+              url
+              state
+              number
+              labels(first: 20){
+                edges {
+                  node{
+                    name
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    `);
 
-    if (res.status !== 200) throw Error("failed to fetch data");
+    const edges = removeMaybe(res.repository.pullRequests.edges ?? []);
+    const prs = removeMaybe(edges.map((edge) => edge.node)).filter((pr) =>
+      Boolean(pr)
+    ) as PullRequest[];
 
-    data = [...data, ...res.data];
+    if (!res) throw Error("failed to fetch data");
 
-    if (res.data.length < pageSize) {
+    data = [...data, ...prs];
+
+    if (!prs.length) {
       fetching = false;
+      continue;
     }
 
+    cursor = edges.length > 0 ? edges[edges.length - 1]?.cursor : "";
     page++;
   }
 
   return data;
 };
 
-const isBackPortLabel = (label: any) =>
-  label.name.match(/backport [\d\..|main]/) !== null;
-const getbackportLabels = (pr: any) => pr.labels.filter(isBackPortLabel);
+const isBackPortLabel = (label: LabelEdge) =>
+  label?.node?.name.match(/backport [\d\..|main]/) !== null;
+const getBackportLabels = (pr: PullRequest) => {
+  const labelEdges = removeMaybe(pr.labels?.edges ?? []);
+  return removeMaybe(labelEdges.filter(isBackPortLabel) || []);
+};
 
 const getSearchString = (title: string) => {
   let s = title;
@@ -81,9 +114,9 @@ const getSearchString = (title: string) => {
 const search = (a: string, b: string) =>
   a.toLowerCase().trim().includes(b.toLowerCase().trim());
 
-const isBackportPr = (pr: any) => !!pr.title.match(BACKPORT_PREFIX_RGX);
+const isBackportPr = (pr: PullRequest) => !!pr.title.match(BACKPORT_PREFIX_RGX);
 
-const isBackportOfPr = (pr: any, backPr: any): boolean => {
+const isBackportOfPr = (pr: PullRequest, backPr: PullRequest): boolean => {
   if (pr.number === DEBUG.src && backPr.number === DEBUG.dest) {
     // deno-lint-ignore no-debugger
     debugger;
@@ -104,7 +137,7 @@ const isBackportOfPr = (pr: any, backPr: any): boolean => {
 
 console.clear();
 log("Started script");
-let prs: any[] = [];
+let prs: PullRequest[] = [];
 if (USE_CACHE) {
   log("Loading cache data");
   const decoder = new TextDecoder("utf-8");
@@ -121,23 +154,32 @@ if (USE_CACHE) {
 
 log("Get all Pr's with backport labels");
 const prsToValidate = prs.filter((pr) => {
-  if (pr.status === "open") return false; // Ignore open PR's
-  if (pr.merged_at === null) return false; // Ignore closed and not merged PR's
+  if (["OPEN", "CLOSED"].includes(pr.state)) return false; // Ignore open and closed PR's
+  // if (pr.merged_at === null) return false; // Ignore closed and not merged PR's
   if (IGNORE_PRS.includes(pr.number)) return false; // Ignore list
-  const backportLabels = getbackportLabels(pr);
+  const backportLabels = getBackportLabels(pr);
   return backportLabels.length > 0;
 });
 
 log("Get all Backport PRs");
-const backportPrs = prs.filter(isBackportPr);
+const backportPrs = prs
+  .filter(isBackportPr)
+  .filter((pr) => ["OPEN", "MERGED"].includes(pr.state)); // Keep all open and merged PR's
 
 debugger;
 
 log("Caculate PRs with missing backports");
-const missingBackports: any = {};
+const missingBackports: {
+  [key: string]: {
+    pr: PullRequest;
+    verifyUrl: string;
+    labels: LabelEdge[];
+  };
+} = {};
+
 prsToValidate.forEach((pr) => {
-  pr.labels.forEach((label: any) => {
-    if (!isBackPortLabel(label)) return;
+  pr.labels?.edges?.forEach((label) => {
+    if (!label || !isBackPortLabel(label)) return;
 
     const backportPrsForThisPrLabel = backportPrs.filter((backPr) => {
       return isBackportOfPr(pr, backPr);
@@ -162,11 +204,11 @@ prsToValidate.forEach((pr) => {
 // Write to file
 const writeStream = createWriteStream(LOG_FILE);
 writeStream.write("# Missing backport PR's\n\n");
-Object.values(missingBackports).forEach(({ pr, verifyUrl, labels }: any) => {
+Object.values(missingBackports).forEach(({ pr, verifyUrl, labels }) => {
   const msg = [
     `- ${pr.title}  `,
     `    Missing backports: ${JSON.stringify(
-      labels.map((l: any) => l.name)
+      labels.map((l) => l.node?.name)
     )}  `,
     `    ID: ${pr.number} | [Verify](${verifyUrl})\n`,
   ].join("\n");
