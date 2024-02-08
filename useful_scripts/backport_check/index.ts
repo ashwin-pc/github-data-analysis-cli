@@ -13,14 +13,16 @@ const configData = await config();
 
 // Use for debugging the script to understand why the check did not find the correct backport PR
 const DEBUG = {
-  src: 2890,
-  dest: 2924,
+  src: 5777,
+  dest: 5820,
 };
 
 const USE_CACHE = configData["CACHE"] === "true" || false;
 const CACHE_FILE = "./data/cache.json";
 const LOG_FILE = "./data/log.md";
-const BACKPORT_PREFIX_RGX = /\[.*Backport \d..\] ?(.*)/i;
+
+const BACKPORT_PREFIX_RGX =
+  /\[.*(?:Backport (\d..|main)|(?:\d..|main) Backport)\] ?(.*)/i;
 const octokit = new Octokit({
   auth: configData["ACCESS_TOKEN"],
 });
@@ -98,7 +100,7 @@ const getSearchString = (title: string) => {
   // Remove regex match group
   const simplify = (str: string, regex: RegExp) => {
     const match = str.match(regex);
-    return match ? match[1] : str;
+    return match ? match[match.length - 1] : str;
   };
 
   // Remove [Backport x.x]
@@ -117,6 +119,7 @@ const search = (a: string, b: string) =>
 const isBackportPr = (pr: PullRequest) => !!pr.title.match(BACKPORT_PREFIX_RGX);
 
 const isBackportOfPr = (pr: PullRequest, backPr: PullRequest): boolean => {
+  // To help debugging why a backport was not caught with the script
   if (pr.number === DEBUG.src && backPr.number === DEBUG.dest) {
     // deno-lint-ignore no-debugger
     debugger;
@@ -210,7 +213,7 @@ Object.values(missingBackports).forEach(({ pr, verifyUrl, labels }) => {
     `    Missing backports: ${JSON.stringify(
       labels.map((l) => l.node?.name)
     )}  `,
-    `    ID: ${pr.number} | [Verify](${verifyUrl})\n`,
+    `    ID: [${pr.number}](https://github.com/opensearch-project/OpenSearch-Dashboards/pull/${pr.number}) | [Verify](${verifyUrl})\n`,
   ].join("\n");
 
   writeStream.write(msg);
